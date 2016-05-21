@@ -15,6 +15,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cmath>
+#include <random>
 
 //#define NDEBUG
 #include <assert.h>
@@ -77,10 +78,11 @@ public:
 #pragma mark Interfaces
     void Insert(const ELEMTYPE min[NUMDIMS], const ELEMTYPE max[NUMDIMS], const DATATYPE& data);
     void Delete(const ELEMTYPE min[NUMDIMS], const ELEMTYPE max[NUMDIMS], int flag);
-    int Search(const ELEMTYPE min[NUMDIMS], const ELEMTYPE max[NUMDIMS], int flag, vector<DATATYPE> &rData);
+    int Search(const ELEMTYPE min[NUMDIMS], const ELEMTYPE max[NUMDIMS], vector<DATATYPE> &rData, int flag = SEARCH_FLAG_INTERSECT);
     int NeighborSearch(const ELEMTYPE center[NUMDIMS], int searchCount, vector<DATATYPE> &rData);
     void removeAll();
     int count();
+    void randomReinsert();
 
 protected:
     
@@ -143,13 +145,31 @@ protected:
         }
     };
     struct SortByOverlapEnlargement : public std::binary_function<const Node * const, const Node * const, bool> {
+//        Rect center;
+        Node *p;
         Rect center;
-        explicit SortByOverlapEnlargement (const Rect &newRect) {center.copyFrom(newRect);}
+        explicit SortByOverlapEnlargement (Node *parent, const Rect &r) : p(parent) {rectCopy(center, r);}
         
         bool operator() (const Node * const n1, const Node * const n2) const {
-            return intersectVolume(n1->boundingRect, center) > intersectVolume(n2->boundingRect, center);
+//            return intersectVolume(n1->boundingRect, center) < intersectVolume(n2->boundingRect, center);
+            
+            ELEMTYPEREAL v1, v2;
+            v1 = overlapsVolume(p, n1, n1->boundingRect);
+            v2 = overlapsVolume(p, n2, n2->boundingRect);
+            Rect r1, r2;
+            rectCopy(r1, boundingRect(n1->boundingRect, center));
+            rectCopy(r2, boundingRect(n2->boundingRect, center));
+            ELEMTYPEREAL V1, V2;
+            V1 = overlapsVolume(p, n1, r1);
+            V2 = overlapsVolume(p, n2, r2);
+            return (V1 - v1) < (V2 - v2);
+            
         }
     };
+    
+    static bool sortByDistance(pair<DATATYPE, ELEMTYPE> a, pair<DATATYPE, ELEMTYPE> b) {
+        return a.second < b.second;
+    }
     
 #pragma mark utilities
 protected:
@@ -162,7 +182,7 @@ protected:
     static bool intersect(const Rect &rect1, const Rect &rect2);
     static bool intersectWithoutCenter(const Rect &rect1, const Rect &rect1Center, const Rect &rect2);
     static ELEMTYPEREAL intersectVolume(const Rect &rect1, const Rect &rect2);
-    static ELEMTYPEREAL overlapsVolume(Node *node, int index);
+    static ELEMTYPEREAL overlapsVolume(const Node *node, const Node *child, const Rect &rect);
     static Rect boundingRect(const Rect &rect1, const Rect &rect2);
     static void rectCopy(Rect &dest, const Rect src);
     static ELEMTYPEREAL rectangularVolume(const Rect &rect);
@@ -170,6 +190,7 @@ protected:
     ELEMTYPEREAL rectVolume(const Rect &rect);
     static ELEMTYPE rectMargin(const Rect &rect);
     static ELEMTYPE squaredDistanceBetweenRects(const Rect &rect1, const Rect &rect2);
+    static ELEMTYPE maxDimDistanceBetweenRects(const Rect &rect1, const Rect &rect2);
     void resizeNode(Node *node);
 
 #pragma mark insert
@@ -179,6 +200,9 @@ protected:
     Node* splitNode(Node *node);
     void reinsert(Node *node);
 #pragma mark remove
+#pragma mark random reinsert
+
+    void randomReinsertNode(Node *node, vector<Node *> &reinsertList);
 #pragma mark search
     bool accept(const Rect &query, const Rect &rect, int flag);
     void searchInternalNode(Node *node, const Rect &query, vector<pair<DATATYPE, ELEMTYPE> > &result, int flag, int &diskAccessCount);
@@ -196,7 +220,7 @@ public:
     };
     
     struct Node: public generalNode {
-        int childCount() {return (int)childs.size();}
+        int childCount() const {return (int)childs.size();}
         int level;  // level of this node, 0 for leaf node
         vector<Node*> childs;
     };
@@ -330,7 +354,7 @@ int RSTAR_TREE_QUAL::cover(const Rect &rect1, const Rect &rect2) {
     for (int i = 0; i < NUMDIMS; ++i)
     {
         int temp1 = MAX_INDEX(rect1.mins[i], rect2.mins[i]);
-        int temp2 = MAX_INDEX(rect1.maxs[i], rect2.maxs[i]);
+        int temp2 = MIN_INDEX(rect1.maxs[i], rect2.maxs[i]);
         if (temp1 == temp2 && temp1 == f)
         {
             continue;
@@ -338,7 +362,7 @@ int RSTAR_TREE_QUAL::cover(const Rect &rect1, const Rect &rect2) {
             return 0;
         }
     }
-    return f;
+    return 3 - f;
     // return 1 means that rect1 fully covers rect2
     // return 2 means that rect2 fully covers rect1
 }
@@ -380,13 +404,13 @@ ELEMTYPEREAL RSTAR_TREE_QUAL::intersectVolume(const Rect &rect1, const Rect &rec
 }
 
 RSTAR_TREE_TEMPLETE
-ELEMTYPEREAL RSTAR_TREE_QUAL::overlapsVolume(RStarTree::Node *node, int index) {
+ELEMTYPEREAL RSTAR_TREE_QUAL::overlapsVolume(const Node *node, const Node *child, const Rect &rect) {
     
     ELEMTYPEREAL v = (ELEMTYPEREAL)0;
     
     for (int i = 0; i < node->childCount(); i++) {
-        if (i != index) {
-            v = v + intersectVolume(node->childs[i]->boundingRect, node->childs[index]->boundingRect);
+        if (node->childs[i] != child) {
+            v = v + intersectVolume(node->childs[i]->boundingRect, rect);
         }
     }
     return v;
@@ -480,6 +504,18 @@ ELEMTYPE RSTAR_TREE_QUAL::squaredDistanceBetweenRects(const RStarTree::Rect &rec
 }
 
 RSTAR_TREE_TEMPLETE
+ELEMTYPE RSTAR_TREE_QUAL::maxDimDistanceBetweenRects(const RStarTree::Rect &rect1, const RStarTree::Rect &rect2) {
+    ELEMTYPE d = 0;
+    for (int i = 0; i < NUMDIMS; i++) {
+        ELEMTYPE t = abs((rect1.mins[i] + rect1.maxs[i]) / 2 - (rect2.mins[i] + rect2.maxs[i]) / 2);
+        if (t > d) {
+            d = t;
+        }
+    }
+    return d;
+}
+
+RSTAR_TREE_TEMPLETE
 void RSTAR_TREE_QUAL::resizeNode(Node *node) {
     
     if (node->childCount() == 0) {
@@ -512,7 +548,7 @@ void RSTAR_TREE_QUAL::Insert(const ELEMTYPE *min, const ELEMTYPE *max, const DAT
 RSTAR_TREE_TEMPLETE
 typename RSTAR_TREE_QUAL::Node* RSTAR_TREE_QUAL::chooseSubtree(RStarTree::leafNode *lnode, RStarTree::Node *node) {
     if (node->level == 1) {
-        return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByOverlapEnlargement(lnode->boundingRect)));
+        return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByOverlapEnlargement(node, lnode->boundingRect)));
     } else {
         return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByAreaEnlargement(lnode->boundingRect)));
     }
@@ -676,10 +712,47 @@ void RSTAR_TREE_QUAL::reinsert(RStarTree::Node *node) {
 
 #pragma mark Remove
 
+#pragma mark Random Reinsert
+
+RSTAR_TREE_TEMPLETE
+void RSTAR_TREE_QUAL::randomReinsert() {
+    
+    vector<Node *> list;
+    randomReinsertNode(root, list);
+    srand(time(NULL));
+    for (int i = 0; i < (int)list.size(); i++) {
+        insertInternalNode((leafNode *)list[i], root);
+    }
+    
+}
+
+RSTAR_TREE_TEMPLETE
+void RSTAR_TREE_QUAL::randomReinsertNode(RStarTree::Node *node, vector<RStarTree::Node *> &reinsertList) {
+    
+    if (node->level == 0) {
+//        std::random_shuffle(node->childs.begin(), node->childs.end());
+        std:: shuffle(node->childs.begin(), node->childs.end(), std::default_random_engine(time(NULL)));
+
+        
+        reinsertList.insert(reinsertList.end(), node->childs.begin() + MINNODE, node->childs.end());
+        node->childs.erase(node->childs.begin() + MINNODE, node->childs.end());
+        
+        resizeNode(node);
+        
+    } else {
+        for (int i = 0; i < (int)node->childs.size() ; i++) {
+            randomReinsertNode(node->childs[i], reinsertList);
+            resizeNode(node);
+        }
+    }
+    
+}
+
+
 #pragma mark Search
 
 RSTAR_TREE_TEMPLETE
-int RSTAR_TREE_QUAL::Search(const ELEMTYPE *min, const ELEMTYPE *max, int flag, vector<DATATYPE> &rData) {
+int RSTAR_TREE_QUAL::Search(const ELEMTYPE *min, const ELEMTYPE *max, vector<DATATYPE> &rData, int flag) {
     
     Rect query;
     initRect(query, min, max);
@@ -698,27 +771,32 @@ int RSTAR_TREE_QUAL::Search(const ELEMTYPE *min, const ELEMTYPE *max, int flag, 
 RSTAR_TREE_TEMPLETE
 int RSTAR_TREE_QUAL::NeighborSearch(const ELEMTYPE *center, int searchCount, vector<DATATYPE> &rData) {
     
+    Rect a;
+    initRect(a, center, center);
+    
     Rect query, queryCenter;
     ELEMTYPE r1 = 10, r2 = 0;
     initRectWithCenterAndRadius(query, center, r1);
-    initRectWithCenterAndRadius(queryCenter, center, r1);
+    initRectWithCenterAndRadius(queryCenter, center, r2);
     
     vector<pair<DATATYPE, ELEMTYPE> > result;
     int count = 0;
     
     while (true) {
+        bool test = intersectWithoutCenter(query, queryCenter, a);
         searchInternalNodeWithoutCenter(root, query, queryCenter, result, count);
         if (result.size() >= searchCount) {
             break;
         } else {
-            r2 = r1;
+            r2 = r1 + 1;
             r1 = r1 * 2;
             initRectWithCenterAndRadius(query, center, r1);
-            initRectWithCenterAndRadius(queryCenter, center, r1);
+            initRectWithCenterAndRadius(queryCenter, center, r2);
         }
     }
+    std::partial_sort(result.begin(), result.begin() + searchCount, result.end(), sortByDistance);
     vector<DATATYPE>().swap(rData);
-    for (unsigned long i = 0; i < result.size(); i++) {
+    for (unsigned long i = 0; i < searchCount; i++) {
         rData.push_back(result[i].first);
     }
     return count;
@@ -780,6 +858,8 @@ void RSTAR_TREE_QUAL::searchInternalNodeWithoutCenter(RStarTree::Node *node, con
                 pair<DATATYPE, ELEMTYPEREAL> p;
                 p.first = l->data;
                 p.second = squaredDistanceBetweenRects(query, l->boundingRect);
+//                p.second = maxDimDistanceBetweenRects(query, l->boundingRect);
+
                 result.push_back(p);
             }
         }
