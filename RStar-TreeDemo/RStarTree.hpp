@@ -20,6 +20,10 @@
 //#define NDEBUG
 #include <assert.h>
 
+int choose_subtree_strategy = 1;
+int distance_method = 1;
+int using_rect_without_center = 1;
+
 using namespace std;
 
 #define MAX(a, b) (a > b ? a : b)
@@ -191,6 +195,7 @@ protected:
     static ELEMTYPE rectMargin(const Rect &rect);
     static ELEMTYPE squaredDistanceBetweenRects(const Rect &rect1, const Rect &rect2);
     static ELEMTYPE maxDimDistanceBetweenRects(const Rect &rect1, const Rect &rect2);
+    static ELEMTYPE cityBlockDistanceBetweenRects(const Rect &rect1, const Rect &rect2);
     void resizeNode(Node *node);
 
 #pragma mark insert
@@ -516,6 +521,16 @@ ELEMTYPE RSTAR_TREE_QUAL::maxDimDistanceBetweenRects(const RStarTree::Rect &rect
 }
 
 RSTAR_TREE_TEMPLETE
+ELEMTYPE RSTAR_TREE_QUAL::cityBlockDistanceBetweenRects(const RStarTree::Rect &rect1, const RStarTree::Rect &rect2) {
+    
+    ELEMTYPE d = 0;
+    for (int i = 0; i < NUMDIMS; i++) {
+        d = d + abs((rect1.mins[i] + rect1.maxs[i]) / 2 - (rect2.mins[i] + rect2.maxs[i]) / 2);
+    }
+    return d;
+}
+
+RSTAR_TREE_TEMPLETE
 void RSTAR_TREE_QUAL::resizeNode(Node *node) {
     
     if (node->childCount() == 0) {
@@ -547,8 +562,12 @@ void RSTAR_TREE_QUAL::Insert(const ELEMTYPE *min, const ELEMTYPE *max, const DAT
 
 RSTAR_TREE_TEMPLETE
 typename RSTAR_TREE_QUAL::Node* RSTAR_TREE_QUAL::chooseSubtree(RStarTree::leafNode *lnode, RStarTree::Node *node) {
-    if (node->level == 1) {
-        return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByOverlapEnlargement(node, lnode->boundingRect)));
+    if (choose_subtree_strategy == 1) {
+        if (node->level == 1) {
+            return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByOverlapEnlargement(node, lnode->boundingRect)));
+        } else {
+            return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByAreaEnlargement(lnode->boundingRect)));
+        }
     } else {
         return static_cast<Node *>(* std::min_element(node->childs.begin(), node->childs.end(), SortByAreaEnlargement(lnode->boundingRect)));
     }
@@ -775,7 +794,7 @@ int RSTAR_TREE_QUAL::NeighborSearch(const ELEMTYPE *center, int searchCount, vec
     initRect(a, center, center);
     
     Rect query, queryCenter;
-    ELEMTYPE r1 = 10, r2 = 0;
+    ELEMTYPE r1 = 200, r2 = 0, d = 300;
     initRectWithCenterAndRadius(query, center, r1);
     initRectWithCenterAndRadius(queryCenter, center, r2);
     
@@ -783,18 +802,32 @@ int RSTAR_TREE_QUAL::NeighborSearch(const ELEMTYPE *center, int searchCount, vec
     int count = 0;
     
     while (true) {
-        bool test = intersectWithoutCenter(query, queryCenter, a);
-        searchInternalNodeWithoutCenter(root, query, queryCenter, result, count);
+        
+        if (using_rect_without_center == 1) {
+            searchInternalNodeWithoutCenter(root, query, queryCenter, result, count);
+        } else {
+            vector<pair<DATATYPE, ELEMTYPE> >().swap(result);
+            searchInternalNode(root, query, result, SEARCH_FLAG_INTERSECT, count);
+        }
+        
         if (result.size() >= searchCount) {
             break;
         } else {
             r2 = r1 + 1;
-            r1 = r1 * 2;
+            r1 = r1 + d;
             initRectWithCenterAndRadius(query, center, r1);
             initRectWithCenterAndRadius(queryCenter, center, r2);
         }
     }
     std::partial_sort(result.begin(), result.begin() + searchCount, result.end(), sortByDistance);
+    
+    
+    for (int i = 0; i < searchCount; i++) {
+        cout << result[i].second << "\t";
+    }
+    cout << endl;
+    
+    
     vector<DATATYPE>().swap(rData);
     for (unsigned long i = 0; i < searchCount; i++) {
         rData.push_back(result[i].first);
@@ -857,9 +890,20 @@ void RSTAR_TREE_QUAL::searchInternalNodeWithoutCenter(RStarTree::Node *node, con
                 ACCESS_NODE(diskAccessCount)
                 pair<DATATYPE, ELEMTYPEREAL> p;
                 p.first = l->data;
-                p.second = squaredDistanceBetweenRects(query, l->boundingRect);
-//                p.second = maxDimDistanceBetweenRects(query, l->boundingRect);
-
+                switch (distance_method) {
+                    case 1:
+                        p.second = cityBlockDistanceBetweenRects(query, l->boundingRect);
+                        break;
+                    case 2:
+                        p.second = squaredDistanceBetweenRects(query, l->boundingRect);
+                        break;
+                    case 3:
+                        p.second = maxDimDistanceBetweenRects(query, l->boundingRect);
+                        break;
+                    default:
+                        p.second = squaredDistanceBetweenRects(query, l->boundingRect);
+                        break;
+                }
                 result.push_back(p);
             }
         }

@@ -10,86 +10,131 @@
 #include <fstream>
 #include <string>
 #include <assert.h>
-#include "RStarTree.hpp"
 #include "proj1.hpp"
 
 using namespace std;
 
+extern int choose_subtree_strategy;
+extern int distance_method;
+extern int using_rect_without_center;
+
+
 int main(int argc, const char * argv[]) {
     // insert code here...
     
-//    RStarTree<std::string, int, 9, RSTAR_TREE_USING_MBR | RSTAR_TREE_NO_NEED_TO_RELEASE_DATA, double, 10, 4> t;
-////
-//    ifstream inf("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/Color_Moment/color_moment_feature.txt");
-//    ifstream datainf("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/Color_Moment/imagelist.txt");
-//    assert(inf.is_open() && datainf.is_open());
-//    int m;
-//    inf>>m;
-//    while (!inf.eof()) {
-//        int temp[9];
-//        for (int i = 0; i < 9; i++) {
-//            inf>>temp[i];
-//        }
-//        string a;
-//        getline(datainf, a);
-//        t.Insert(temp, temp, a);
-//    }
-//
-//    int searchl[9] = {7315, 7328, 8919, 3086, 1739, 1572, 3794, 2097, 2402};
-////    int searchl[9] = {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000};
-//    int searchr[9] = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
-//
-//    vector<string> result;
+/*-------------------------R*TreeParamTest---------------------------*/
+    
+//    vector<pair<int, int> > params;
+//    params.push_back(pair<int, int>(10, 2));
+//    params.push_back(pair<int, int>(10, 3));
+//    params.push_back(pair<int, int>(10, 4));
+//    params.push_back(pair<int, int>(10, 5));
+//    params.push_back(pair<int, int>(20, 5));
+//    params.push_back(pair<int, int>(20, 8));
+//    params.push_back(pair<int, int>(20, 10));
+//    params.push_back(pair<int, int>(30, 10));
+//    params.push_back(pair<int, int>(30, 15));
+//    params.push_back(pair<int, int>(50, 10));
+//    params.push_back(pair<int, int>(50, 20));
+//    params.push_back(pair<int, int>(50, 25));
+//    params.push_back(pair<int, int>(100, 50));
 //    
-//    int count = t.Search(searchl, searchl, result, SEARCH_FLAG_INTERSECT);
-//    cout<<count<<endl<<result.size()<<endl;
-    
-/*------------------------------HOG_NEW------------------------------*/
-    
-    Proj1Test<std::string, double, 20, double, 10, 4> test;
-    test.setFeaturePath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/HOG/hog_20_new.txt");
-    test.setImageListPath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/HOG/imagelist.txt");
-    test.init();
-    test.MaxDiskAccessTestForExactMatch();
-    for (int i = 0; i < 100; i++) {
-        for (int i = 0; i < 10; i++) {
-            test.performRandomResinsert();
-        }
-        test.MaxDiskAccessTestForExactMatch();
-    }
-//    Proj1Test<std::string, double, 20, double, 10, 4>::neighborSearchParam param;
-//    cout << test.neighborSearchTest("n03767203_4464.JPEG", 500, param)<<endl;
-
-//    test.MaxPrecisionAndRecallNeighborSearchTest(500);
-    
-/*-----------------------------ColorMoment----------------------------*/
-    
-//    Proj1Test<std::string, int, 9, double, 10, 4> test;
+//
+//    Proj1Test<std::string, int, 9, double, 20, 8> test;
 //    test.setFeaturePath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/Color_Moment/color_moment_feature.txt");
 //    test.setImageListPath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/Color_Moment/imagelist.txt");
 //    test.init();
 //    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
+
+    
+/*----------------------------Manual-Test----------------------------*/
+    
+    Proj1Test<std::string, double, 20, double, 10, 4> test;
+    test.setFeaturePath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/HOG/hog_sys_20_800600.txt");
+    test.setImageListPath("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/HOG/imagelist.txt");
+    test.init();
+    
+/* search performance test */
+    
+//    int p[] = {0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500, 1000};
 //    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
-//    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
-//    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
-//    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
-//    test.MaxDiskAccessTestForExactMatch();
-//    test.performRandomResinsert();
-//    test.MaxDiskAccessTestForExactMatch();
-//    for (int i = 0; i < 100; i++) {
-//        for (int i = 0; i < 10; i++) {
-//            test.performRandomResinsert();
+//    int index = 0;
+//    for (int i = 0; index < 13; i++) {
+//        if (i == p[index]) {
+//            test.MaxDiskAccessTestForExactMatch();
+//            index++;
 //        }
-//        test.MaxDiskAccessTestForExactMatch();
+//        test.performRandomResinsert();
 //    }
-//    Proj1Test<std::string, int, 9, double, 10, 4>::neighborSearchParam param;
-//    cout << test.neighborSearchTest("n03767203_4464.JPEG", 500, param)<<endl;
+    
+    
+/* precision and recall test */
+    
+//    int p[] = {500, 200, 100, 50, 20, 5};
+//    for (int i = 0; i < 6; i++) {
+//        test.MaxPrecisionAndRecallNeighborSearchTest(p[i]);
+//    }
+    
+/* query form file */
+    
+    vector<string> paths;
+    vector<string> names;
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/bird_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/biulding_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/butterfly_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/flower_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/insect_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/piano_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/plane_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/watermill_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/wine_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/women_query.txt");
+    paths.push_back("/Users/MarkLv/Documents/Tsinghua/2(2)/ADS/proj1/Features/queries/random_query.txt");
+    names.push_back("bird");
+    names.push_back("biulding");
+    names.push_back("butterfly");
+    names.push_back("flower");
+    names.push_back("insect");
+    names.push_back("piano");
+    names.push_back("plane");
+    names.push_back("watermill");
+    names.push_back("wine");
+    names.push_back("women");
+    names.push_back("random");
+    
+    test.testQueryFromFile(paths[10], 11);
+    
+    
+/* test for different 'ChooseSubtree method' and 'distance method' in R*tree */
+    
+//    for (int j = 1; j <= 3; j++) {
+////        for (int k = 1; k <= 2; k++) {
+//            choose_subtree_strategy = 1;
+//            distance_method = j;
+//            for (int i = 0; i < paths.size(); i++) {
+//                cout << names[i] << "\t";
+//                test.testQueryFromFile(paths[i], 500);
+//                
+//            }
+//            cout << endl<<endl<<endl<<endl;
+////        }
+//    }
+
+/* test for using hollow rect in R*tree */
+    
+//    for (int j = 1; j <= 2; j++) {
+//        using_rect_without_center = j;
+//
+//        for (int i = 0; i < paths.size(); i++) {
+//            cout << names[i] << "\t";
+//            test.testQueryFromFile(paths[i], 500);
+//        }
+//    }
+    
+/* test for calculate max/min precision/recall for k-NN search */
+    
 //    test.MaxPrecisionAndRecallNeighborSearchTest(500);
+    
     
     return 0;
 }

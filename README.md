@@ -11,8 +11,8 @@ RStarTree implementation for ADS class
 ## To-do List
 
 * Finish Testing program.
-	* Maximun disk access for exact match
-	* Precision and Recall of neighbor search
+	* Maximun disk access for exact match      (✔)
+	* Precision and Recall of neighbor search  (✔)
 * Add GUI for testing program.
 * implement different kind of spliting
 	* basic R-Tree split
